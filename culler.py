@@ -38,7 +38,7 @@ ignored_namespaces = {
 }
 
 ignored_notebooks = {
-    IgnoreNotebook(notebook.strip(), namespace.strip())
+    IgnoreNotebook(namespace.strip(), notebook.strip())
     for item in IGNORE_NOTEBOOKS.split(",")
     if item.strip()
     for notebook, namespace in [item.split(":", 1)]
