@@ -22,7 +22,8 @@ spec:
           restartPolicy: OnFailure
           containers:
           - name: culler
-            image: ghcr.io/gnush/kubeflow-notebook-culler:latest
+            # release tag; bump it in the commit the tag points at, before tagging
+            image: ghcr.io/gnush/kubeflow-notebook-culler:1.0.0
             imagePullPolicy: IfNotPresent
             env:
             # Required. Point at a Prometheus that scrapes the notebook pods,

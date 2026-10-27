@@ -42,65 +42,55 @@ PROMETHEUS_URL=http://localhost:9090 DRY_RUN=true python3 culler.py
 
 ### Deploy
 
-Deploy the culler as a Kubernetes CronJob using the provided manifests in the `k8s/` directory. Uses the `kubeflow` namespace.
-
-**Prerequisite**: Prometheus metrics endpoint accessible from the cluster
-
-**Customization**:
-In `k8s/crontab.yaml`:
-- Modify the `schedule` to change the execution frequency
-- Set `PROMETHEUS_URL` to your Prometheus endpoint
-- Update the `image` tag to use a different version
-- Adjust environment variables in the CronJob spec to tune thresholds and behavior
-
-#### Manual
+The repo root is a kustomize base: ServiceAccount, ClusterRole and
+ClusterRoleBinding, and the CronJob, all in namespace `kubeflow`. Prometheus
+must be reachable from the cluster.
 
 ```bash
-kubectl apply -f k8s/service-account.yaml
-kubectl apply -f k8s/rbac.yaml
-kubectl apply -f k8s/crontab.yaml
+kubectl apply -k .
 ```
 
-**To enable actual culling** (disable dry-run):
+From a release tag:
+
 ```bash
-kubectl set env cronjob/kubeflow-notebook-culler DRY_RUN=false -n kubeflow
+kubectl apply -k 'github.com/gnush/kubeflow-notebook-culler?ref=<version>'
 ```
 
-#### Fleet
-
-To deploy with Fleet, include the following manifests in your Fleet bundle and apply the bundle to the target cluster:
-- `k8s/service-account.yaml`
-- `k8s/rbac.yaml`
-- `k8s/crontab.yaml`
-
-#### Flux
-
-To deploy with Flux, include the manifests in an existing Flux-managed repository (or create a `Kustomization` that references this repository) and ensure the following manifests are applied:
-
-- `k8s/service-account.yaml`
-- `k8s/rbac.yaml`
-- `k8s/crontab.yaml`
-
+The base has `DRY_RUN=true` and a placeholder `PROMETHEUS_URL`. Set both, and
+the schedule or thresholds if they differ, in an overlay:
 
 ```yaml
-apiVersion: kustomize.toolkit.fluxcd.io/v1
-kind: Kustomization
-metadata:
-  name: kubeflow-notebook-culler
-  namespace: flux-system
-spec:
-  interval: 1h
-  path: ./k8s
-  prune: true
-  sourceRef:
-    kind: GitRepository
-    name: <your-git-repo>
-  healthChecks:
-    - apiVersion: batch/v1
+resources:
+  - github.com/gnush/kubeflow-notebook-culler?ref=<version>
+patches:
+  - target: {kind: CronJob, name: kubeflow-notebook-culler}
+    patch: |-
+      apiVersion: batch/v1
       kind: CronJob
-      name: kubeflow-notebook-culler
-      namespace: kubeflow
+      metadata: {name: kubeflow-notebook-culler}
+      spec:
+        jobTemplate:
+          spec:
+            template:
+              spec:
+                containers:
+                  - name: culler
+                    env:
+                      - {name: PROMETHEUS_URL, value: "http://prometheus-k8s.monitoring.svc:9090"}
+                      - {name: DRY_RUN, value: "false"}
 ```
+
+`env` in a patch merges by name, so only the changed variables are listed. A
+different image is `kustomize edit set image
+ghcr.io/gnush/kubeflow-notebook-culler=<image>`.
+
+#### GitOps
+
+Flux and Argo CD build the root, so `path: .` installs what `apply -k .` does;
+pin a release tag in `targetRevision` / `ref.tag`. Fleet lists `paths: [k8s]`
+instead of the root. Per-cluster values go through `spec.images` and
+`spec.patches` (Argo CD: `source.kustomize.*`), not through this repo: the image
+tag is the release.
 
 ## Configuration
 
