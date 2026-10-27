@@ -1,0 +1,44 @@
+name: ci
+
+on:
+  push:
+    branches:
+      - master
+    paths-ignore:
+      - '**.md'
+      - '.gitignore'
+    tags:
+      # x.y.z, vx.y.z, ...
+      - "*.*.*"
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  image:
+    uses: docker/github-builder/.github/workflows/build.yml@v1
+    permissions:
+      contents: read
+      id-token: write # signs attestations and cache entries via GitHub OIDC
+      packages: write
+    with:
+      output: image
+      push: ${{ github.event_name != 'pull_request' }} # only build on pull requests
+      platforms: linux/amd64,linux/arm64
+      meta-images: ghcr.io/${{ github.repository }}
+      meta-tags: |
+        type=semver,pattern={{version}}
+        type=semver,pattern={{major}}.{{minor}}
+        type=semver,pattern={{major}}
+        type=sha
+        type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/') }}
+      cache: true
+      cache-mode: max
+      labels: |
+        org.opencontainers.image.source=https://github.com/${{ github.repository }}
+    secrets:
+      registry-auths: |
+        - registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
