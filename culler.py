@@ -298,7 +298,7 @@ def main():
               plural="notebooks", name=name, body=patch_body
           )
           debug_message(f"Idle threshold reached. Applied stop annotation to notebook '{name}' in namespace '{namespace}'", level=DebugLevel.ACTION)
-        except client.exceptions.ApiException as e:
+        except ApiException as e:
           debug_message(f"Idle threshold reached. Failed to patch notebook '{name}' in namespace '{namespace}': {e}", level=DebugLevel.ERROR)
       else:
         debug_message(f"Idle threshold reached. Would apply stop annotation to notebook '{name}' in namespace '{namespace}'", level=DebugLevel.ACTION)
