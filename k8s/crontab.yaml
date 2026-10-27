@@ -1,0 +1,57 @@
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: kubeflow-notebook-culler
+  namespace: kubeflow
+spec:
+  # every 2 hours on weekdays between 06:21 and 20:21
+  schedule: "21 6-20/2 * * 1-5"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          annotations:
+            # Disable istio sidecar injection, otherwise the jobs will not terminate
+            sidecar.istio.io/inject: "false"
+        spec:
+          serviceAccountName: kubeflow-notebook-culler-sa
+          restartPolicy: OnFailure
+          containers:
+          - name: culler
+            image: ghcr.io/gnush/kubeflow-notebook-culler:latest
+            imagePullPolicy: IfNotPresent
+            env:
+            # Required. Point at a Prometheus that scrapes the notebook pods,
+            # e.g. http://prometheus-k8s.monitoring.svc:9090
+            - name: PROMETHEUS_URL
+              value: "http://prometheus.monitoring.svc:9090"
+            - name: IDLE_TIMEFRAME
+              value: "24h"
+            - name: IDLE_WINDOW
+              value: "15m"
+            - name: NEW_GRACE_PERIOD
+              value: "24h"
+            - name: RESTART_GRACE_PERIOD
+              value: "6h"
+            - name: CPU_THRESHOLD
+              value: "5"
+            - name: GPU_THRESHOLD
+              value: "0.01"
+            - name: NETWORK_THRESHOLD
+              value: "1000"
+            - name: FILESYSTEM_THRESHOLD
+              value: "10"
+            - name: GPU_AGGRESIVE
+              value: "false"
+            - name: GPU_THRESHOLD_AGGRESIVE
+              value: "0.0"
+            - name: DEBUG
+              value: "info"
+            - name: INFO_MULTILINE
+              value: "false"
+            - name: DRY_RUN
+              value: "true"
